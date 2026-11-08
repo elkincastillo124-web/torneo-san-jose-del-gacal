@@ -27,20 +27,34 @@
       margin: 20px 0;
     }
 
-    .tiktok-button {
+    .social-button {
       display: inline-block;
-      background: #00f2ea;
-      color: #111;
-      padding: 15px 30px;
-      margin: 20px 0;
+      padding: 15px 25px;
+      margin: 12px;
       border-radius: 10px;
       text-decoration: none;
       font-weight: bold;
-      font-size: 18px;
+      font-size: 17px;
+      transition: 0.2s;
     }
 
-    .tiktok-button:hover {
-      background: #25d5ce;
+    .social-button:hover {
+      transform: scale(1.04);
+    }
+
+    .tiktok-button {
+      background: #00f2ea;
+      color: #111;
+    }
+
+    .facebook-button {
+      background: #1877f2;
+      color: white;
+    }
+
+    .live-info {
+      color: #ccc;
+      margin-top: 20px;
     }
   </style>
 </head>
@@ -56,25 +70,35 @@
     <h1>📺 TRANSMISIÓN EN VIVO</h1>
 
     <p class="live-status">
-      🔴 SÍGUENOS EN TIKTOK
+      🔴 SIGUE NUESTROS PARTIDOS
     </p>
 
     <p>
-      Mira las novedades y transmisiones
+      Disfruta las transmisiones y novedades
       del Torneo Relámpago San José del Gacal.
     </p>
 
+    <!-- BOTÓN TIKTOK -->
     <a
-      class="tiktok-button"
-      href="https://www.tiktok.com/@elkincastillo797"
+      class="social-button tiktok-button"
+      href="https://www.tiktok.com/@NOMBRE_DE_USUARIO"
       target="_blank"
       rel="noopener noreferrer">
-      🎥 VER EN TIKTOK
+      🎵 VER EN TIKTOK
     </a>
 
-    <p>
-      Visita nuestro perfil para encontrar
-      las transmisiones del torneo.
+    <!-- BOTÓN FACEBOOK -->
+    <a
+      class="social-button facebook-button"
+      href="https://www.facebook.com/Relámpago-san-jose-del-gacal"
+      target="_blank"
+      rel="noopener noreferrer">
+      📘 VER EN FACEBOOK
+    </a>
+
+    <p class="live-info">
+      Entra a nuestras redes sociales para
+      encontrar las transmisiones del torneo.
     </p>
 
   </main>
