@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Administrador | Torneo San José del Gacal</title>
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body data-page="admin">
+
+<header>
+    <img src="WhatsApp Image 2026-11-07 at 7.47.15 PM.jpeg" alt="Logo del torneo" height="50px" width="50px">
+<nav>
+<div class="brand">⚽ <span>TORNEO RELÁMPAGO</span></div>
+<div>
+<a href="index.html">Inicio</a>
+<a href="sorteo.html">Sorteo</a>
+<a href="posiciones.html">Posiciones</a>
+<a href="resultados.html">Resultados</a>
+<a href="calendario.html">Partidos</a>
+<a href="envivo.html">En vivo</a>
+<a href="admin.html">Administrador</a>
+</div>
+</nav>
+</header>
+
+<main>
+<h1>Administración del torneo</h1>
+
+<div id="loginAdmin" class="card">
+<h2>Iniciar sesión</h2>
+
+<div class="form-grid">
+<input id="correo" type="email" placeholder="Correo del administrador">
+<input id="clave" type="password" placeholder="Contraseña">
+<button onclick="iniciarSesion()">Entrar</button>
+</div>
+</div>
+
+<div id="panelAdmin" style="display:none">
+
+<div class="card">
+<h2>Equipos</h2>
+
+<div class="form-grid">
+<input id="nuevoEquipo" placeholder="Nombre del equipo">
+<button onclick="agregarEquipo()">Agregar equipo</button>
+</div>
+
+<div id="editorEquipos"></div>
+</div>
+
+<div class="card">
+<h2>Sorteo</h2>
+<button onclick="realizarSorteo()">🎲 Realizar sorteo</button>
+</div>
+
+<div class="card">
+<h2>Registrar resultado</h2>
+
+<div class="form-grid">
+<select id="local"></select>
+<input id="golesLocal" type="number" min="0" placeholder="Goles local">
+
+<select id="visitante"></select>
+<input id="golesVisitante" type="number" min="0" placeholder="Goles visitante">
+
+<input id="fechaResultado" type="date">
+<button onclick="registrarResultado()">Guardar resultado</button>
+</div>
+</div>
+
+<div class="card">
+<h2>Programar próximo partido</h2>
+
+<div class="form-grid">
+<select id="proximoLocal"></select>
+<select id="proximoVisitante"></select>
+<input id="fechaProximo" placeholder="Fecha y hora">
+<button onclick="agregarProximo()">Agregar partido</button>
+</div>
+</div>
+
+<div class="card">
+<h2>Transmisión de YouTube</h2>
+
+<div class="form-grid">
+<input id="urlYouTube" placeholder="https://www.youtube.com/embed/ID">
+<button onclick="guardarTransmision()">Guardar transmisión</button>
+</div>
+</div>
+
+<div class="card">
+<h2>Cronómetro del partido</h2>
+
+<div class="timer" id="cronometro">00:00</div>
+
+<div class="form-grid">
+<button onclick="iniciarCronometro()">Iniciar</button>
+<button onclick="pausarCronometro()">Pausar</button>
+<button onclick="reiniciarCronometro()">Reiniciar</button>
+</div>
+</div>
+
+<div class="card">
+<button onclick="cerrarSesion()">Cerrar sesión</button>
+</div>
+
+</div>
+
+<p id="estado" class="status">Conectando...</p>
+
+</main>
+
+<footer>Torneo Relámpago San José del Gacal</footer>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
