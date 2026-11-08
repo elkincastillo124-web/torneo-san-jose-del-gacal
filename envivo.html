@@ -1,44 +1,83 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>En vivo | Torneo San José del Gacal</title>
-<link rel="stylesheet" href="estilos.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>En Vivo - Torneo San José del Gacal</title>
+  <link rel="stylesheet" href="estilos.css">
+
+  <style>
+    .live-container {
+      max-width: 850px;
+      margin: 40px auto;
+      padding: 25px;
+      text-align: center;
+      background: #111;
+      color: white;
+      border-radius: 15px;
+    }
+
+    .live-container h1 {
+      color: #39e75f;
+    }
+
+    .live-status {
+      color: #ff4545;
+      font-weight: bold;
+      margin: 20px 0;
+    }
+
+    .tiktok-button {
+      display: inline-block;
+      background: #00f2ea;
+      color: #111;
+      padding: 15px 30px;
+      margin: 20px 0;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: bold;
+      font-size: 18px;
+    }
+
+    .tiktok-button:hover {
+      background: #25d5ce;
+    }
+  </style>
 </head>
-<body data-page="envivo">
 
-<header>
-<nav>
-    <img src="WhatsApp Image 2026-11-07 at 7.47.15 PM.jpeg" alt="Logo del torneo" height="50px" width="50px">
-<div class="brand">⚽ <span>TORNEO RELÁMPAGO</span></div>
-<div>
-<a href="index.html">Inicio</a>
-<a href="sorteo.html">Sorteo</a>
-<a href="posiciones.html">Posiciones</a>
-<a href="resultados.html">Resultados</a>
-<a href="calendario.html">Partidos</a>
-<a href="envivo.html">En vivo</a>
-<a href="admin.html">Administrador</a>
-</div>
-</nav>
-</header>
+<body>
 
-<main>
-<h1>Transmisión en vivo</h1>
+  <header>
+    <h1>Torneo Relámpago San José del Gacal</h1>
+  </header>
 
-<div class="live">
-<h2>Partido en directo</h2>
-<div class="video" id="video">
-La transmisión aparecerá aquí cuando el administrador configure YouTube.
-</div>
-</div>
+  <main class="live-container">
 
-<p id="estado" class="status">Conectando...</p>
-</main>
+    <h1>📺 TRANSMISIÓN EN VIVO</h1>
 
-<footer>Torneo Relámpago San José del Gacal</footer>
+    <p class="live-status">
+      🔴 SÍGUENOS EN TIKTOK
+    </p>
 
-<script type="module" src="app.js"></script>
+    <p>
+      Mira las novedades y transmisiones
+      del Torneo Relámpago San José del Gacal.
+    </p>
+
+    <a
+      class="tiktok-button"
+      href="https://www.tiktok.com/@elkincastillo797"
+      target="_blank"
+      rel="noopener noreferrer">
+      🎥 VER EN TIKTOK
+    </a>
+
+    <p>
+      Visita nuestro perfil para encontrar
+      las transmisiones del torneo.
+    </p>
+
+  </main>
+
 </body>
 </html>
