@@ -160,42 +160,112 @@ function partidosTodosContraTodos(equipos, idaVuelta = false) {
   return partidos;
 }
 
+function crearFixtureGrupo(equipos, grupo, idaVuelta = false) {
+  const lista = [...equipos];
+
+  // Si hay un número impar, un equipo descansa por jornada.
+  if (lista.length % 2 !== 0) lista.push(null);
+
+  const cantidad = lista.length;
+  const jornadas = [];
+
+  for (let ronda = 0; ronda < cantidad - 1; ronda++) {
+    const partidos = [];
+
+    for (let i = 0; i < cantidad / 2; i++) {
+      const local = lista[i];
+      const visitante = lista[cantidad - 1 - i];
+
+      if (local && visitante) {
+        partidos.push({
+          home: ronda % 2 === 0 ? local : visitante,
+          away: ronda % 2 === 0 ? visitante : local
+        });
+      }
+    }
+
+    jornadas.push(partidos);
+
+    // Rotación de equipos para la siguiente jornada.
+    lista.splice(1, 0, lista.pop());
+  }
+
+  const fixture = [];
+
+  jornadas.forEach((partidos, indice) => {
+    partidos.forEach((p, i) => {
+      fixture.push({
+        id: `${grupo}-${indice + 1}-${i + 1}`,
+        group: grupo,
+        round: indice + 1,
+        home: p.home,
+        away: p.away,
+        date: `Jornada ${indice + 1}`,
+        time: ""
+      });
+    });
+  });
+
+  if (idaVuelta) {
+    const primeraVuelta = [...fixture];
+
+    primeraVuelta.forEach((p, i) => {
+      fixture.push({
+        ...p,
+        id: `${grupo}-vuelta-${i + 1}`,
+        round: p.round + jornadas.length,
+        home: p.away,
+        away: p.home,
+        date: `Jornada ${p.round + jornadas.length}`
+      });
+    });
+  }
+
+  return fixture;
+}
+
 function generarCalendario() {
   torneo.upcoming = [];
 
-  if (torneo.format === "todos" || torneo.format === "ida_vuelta") {
-    torneo.upcoming = partidosTodosContraTodos(
-      torneo.teams, torneo.format === "ida_vuelta"
+  if (torneo.format === "todos") {
+    torneo.upcoming = crearFixtureGrupo(
+      torneo.teams,
+      "General"
     );
-    return;
   }
 
-  if (torneo.format === "grupos" && torneo.groupDraw) {
-    Object.values(torneo.groupDraw).forEach(equipos => {
-      torneo.upcoming.push(...partidosTodosContraTodos(equipos));
+  else if (torneo.format === "ida_vuelta") {
+    torneo.upcoming = crearFixtureGrupo(
+      torneo.teams,
+      "General",
+      true
+    );
+  }
+
+  else if (torneo.format === "grupos" && torneo.groupDraw) {
+    Object.entries(torneo.groupDraw).forEach(([grupo, equipos]) => {
+      torneo.upcoming.push(
+        ...crearFixtureGrupo(equipos, grupo)
+      );
     });
-    return;
   }
 
-  if (torneo.format === "eliminacion") {
+  else if (torneo.format === "eliminacion") {
     const equipos = mezclar(torneo.teams);
-    for (let i = 0; i < equipos.length - 1; i += 2) {
+
+    for (let i = 0; i < equipos.length; i += 2) {
       torneo.upcoming.push({
+        id: `eliminacion-${i}`,
+        group: "Eliminación",
+        round: 1,
         home: equipos[i],
-        away: equipos[i + 1],
-        date: "Primera ronda"
-      });
-    }
-    if (equipos.length % 2 === 1) {
-      torneo.upcoming.push({
-        home: equipos[equipos.length - 1],
-        away: "Pasa directamente",
-        date: "Primera ronda - descanso"
+        away: equipos[i + 1] || "Pasa directamente",
+        date: "Primera ronda",
+        time: ""
       });
     }
   }
 }
-
 function pintarInicio() {
   if ($("cantidadEquipos")) {
     $("cantidadEquipos").textContent = torneo.teams.length;
@@ -308,7 +378,16 @@ function pintarCalendario() {
   contenedor.innerHTML = torneo.upcoming.length
     ? torneo.upcoming.map(p => `
       <div class="match">
-        <div class="muted">${escapar(p.date || "Por programar")}</div>
+        <div class="muted">
+          ${escapar(p.group || "General")} -
+          Jornada ${escapar(p.round || "")}
+        </div>
+
+        <div class="muted">
+          ${escapar(p.date || "Fecha por definir")}
+          ${escapar(p.time || "")}
+        </div>
+
         <div class="score">
           <span>${escapar(p.home)}</span>
           <b>VS</b>
@@ -395,6 +474,7 @@ function renderizar() {
   pintarCalendario();
   pintarEnVivo();
   pintarEquiposAdmin();
+  pintarCalendarioAdmin
   pintarCronometro();
   mostrarAdministrador();
 }
@@ -490,7 +570,7 @@ window.aplicarConfiguracionTorneo = async function () {
     ? crearGrupos(torneo.teams, torneo.groupCount)
     : null;
 
-  generarCalendario();
+  torneo.upcoming = [];
   renderizar();
   await guardar();
   mensaje("Configuración del torneo guardada.");
@@ -506,7 +586,6 @@ window.realizarSorteo = async function () {
   const cantidad = Math.min(Math.max(2, Number(torneo.groupCount) || 2), torneo.teams.length);
   torneo.groupDraw = crearGrupos(torneo.teams, cantidad);
   torneo.matches = [];
-  generarCalendario();
   renderizar();
   await guardar();
 };
@@ -636,6 +715,89 @@ window.registrarResultado = async function () {
 
   $("golesLocal").value = "";
   $("golesVisitante").value = "";
+
+  renderizar();
+  await guardar();
+};
+function pintarCalendarioAdmin() {
+  const cont = $("editorCalendario");
+  if (!cont || !administrador) return;
+
+  if (!torneo.upcoming.length) {
+    cont.textContent = "Todavía no hay partidos en el fixture.";
+    return;
+  }
+
+  cont.innerHTML = torneo.upcoming.map((p, i) => `
+    <article class="match">
+      <div class="muted">
+        ${escapar(p.group || "General")} -
+        ${escapar(p.date || "Por programar")}
+      </div>
+
+      <div class="score">
+        <span>${escapar(p.home)}</span>
+        <b>VS</b>
+        <span>${escapar(p.away)}</span>
+      </div>
+
+      <p>Hora: ${escapar(p.time || "Por definir")}</p>
+
+      <button onclick="editarPartido(${i})">
+        Editar partido
+      </button>
+
+      <button class="danger"
+        onclick="eliminarPartidoFixture(${i})">
+        Eliminar
+      </button>
+    </article>
+  `).join("");
+}
+
+window.editarPartido = async indice => {
+  if (!administrador || !torneo) return;
+
+  const partido = torneo.upcoming[indice];
+  if (!partido) return;
+
+  const local = prompt("Equipo local:", partido.home);
+  if (local === null) return;
+
+  const visitante = prompt("Equipo visitante:", partido.away);
+  if (visitante === null) return;
+
+  const fecha = prompt("Jornada o fecha:", partido.date || "");
+  if (fecha === null) return;
+
+  const hora = prompt("Hora del partido:", partido.time || "");
+  if (hora === null) return;
+
+  const nombres = torneo.teams;
+
+  if (
+    !nombres.includes(local.trim()) ||
+    !nombres.includes(visitante.trim()) ||
+    local.trim() === visitante.trim()
+  ) {
+    return alert("Selecciona dos equipos válidos y diferentes.");
+  }
+
+  partido.home = local.trim();
+  partido.away = visitante.trim();
+  partido.date = fecha.trim() || "Por programar";
+  partido.time = hora.trim();
+
+  renderizar();
+  await guardar();
+};
+
+window.eliminarPartidoFixture = async indice => {
+  if (!administrador || !torneo) return;
+
+  if (!confirm("¿Eliminar este partido del fixture?")) return;
+
+  torneo.upcoming.splice(indice, 1);
 
   renderizar();
   await guardar();
