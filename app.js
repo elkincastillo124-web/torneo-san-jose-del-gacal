@@ -42,13 +42,18 @@ function normalizar(datos) {
     matches: Array.isArray(base.matches) ? base.matches : [],
     upcoming: Array.isArray(base.upcoming) ? base.upcoming : [],
     liveUrl: base.liveUrl || "",
-    timer: base.timer || {
-      seconds: 0,
-      startedAt: null,
-      active: false
+    tiktokUrl: base.tiktokUrl || "",
+    facebookUrl: base.facebookUrl || "",
+    format: base.format || "grupos",
+    groupCount: Number(base.groupCount) || 2,
+    timer: {
+      seconds: Number(base.timer?.seconds) || 0,
+      startedAt: base.timer?.startedAt || null,
+      active: !!base.timer?.active
     }
   };
 }
+
 
 async function guardar() {
   if (!administrador || auth.currentUser?.uid !== ADMIN_UID) {
@@ -121,6 +126,76 @@ function calcularTabla(equipos) {
   );
 }
 
+
+function mezclar(lista) {
+  const copia = [...lista];
+  for (let i = copia.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copia[i], copia[j]] = [copia[j], copia[i]];
+  }
+  return copia;
+}
+
+function nombreGrupo(i) {
+  return `Grupo ${i + 1}`;
+}
+
+function crearGrupos(equipos, cantidad) {
+  const grupos = {};
+  for (let i = 0; i < cantidad; i++) grupos[nombreGrupo(i)] = [];
+  mezclar(equipos).forEach((equipo, i) => {
+    grupos[nombreGrupo(i % cantidad)].push(equipo);
+  });
+  return grupos;
+}
+
+function partidosTodosContraTodos(equipos, idaVuelta = false) {
+  const partidos = [];
+  for (let i = 0; i < equipos.length; i++) {
+    for (let j = i + 1; j < equipos.length; j++) {
+      partidos.push({ home: equipos[i], away: equipos[j], date: "Por programar" });
+      if (idaVuelta) partidos.push({ home: equipos[j], away: equipos[i], date: "Por programar" });
+    }
+  }
+  return partidos;
+}
+
+function generarCalendario() {
+  torneo.upcoming = [];
+
+  if (torneo.format === "todos" || torneo.format === "ida_vuelta") {
+    torneo.upcoming = partidosTodosContraTodos(
+      torneo.teams, torneo.format === "ida_vuelta"
+    );
+    return;
+  }
+
+  if (torneo.format === "grupos" && torneo.groupDraw) {
+    Object.values(torneo.groupDraw).forEach(equipos => {
+      torneo.upcoming.push(...partidosTodosContraTodos(equipos));
+    });
+    return;
+  }
+
+  if (torneo.format === "eliminacion") {
+    const equipos = mezclar(torneo.teams);
+    for (let i = 0; i < equipos.length - 1; i += 2) {
+      torneo.upcoming.push({
+        home: equipos[i],
+        away: equipos[i + 1],
+        date: "Primera ronda"
+      });
+    }
+    if (equipos.length % 2 === 1) {
+      torneo.upcoming.push({
+        home: equipos[equipos.length - 1],
+        away: "Pasa directamente",
+        date: "Primera ronda - descanso"
+      });
+    }
+  }
+}
+
 function pintarInicio() {
   if ($("cantidadEquipos")) {
     $("cantidadEquipos").textContent = torneo.teams.length;
@@ -135,19 +210,17 @@ function pintarSorteo() {
   const contenedor = $("grupos");
   if (!contenedor) return;
 
-  if (!torneo.groupDraw) {
-    contenedor.textContent = "Todavía no se ha realizado el sorteo.";
+  if (!torneo.groupDraw || !Object.keys(torneo.groupDraw).length) {
+    contenedor.textContent = torneo.format === "eliminacion"
+      ? "Este torneo se juega por eliminación directa."
+      : "Este formato no utiliza grupos.";
     return;
   }
 
-  contenedor.innerHTML = ["A", "B"].map(grupo => `
+  contenedor.innerHTML = Object.entries(torneo.groupDraw).map(([grupo, equipos]) => `
     <div class="draw-group">
-      <h3>GRUPO ${grupo}</h3>
-      <ol>
-        ${torneo.groupDraw[grupo].map(equipo =>
-          `<li>${escapar(equipo)}</li>`
-        ).join("")}
-      </ol>
+      <h3>${escapar(grupo.startsWith("Grupo") ? grupo.toUpperCase() : "GRUPO " + grupo)}</h3>
+      <ol>${equipos.map(equipo => `<li>${escapar(equipo)}</li>`).join("")}</ol>
     </div>
   `).join("");
 }
@@ -156,65 +229,59 @@ function pintarPosiciones() {
   const contenedor = $("tablas");
   if (!contenedor) return;
 
-  if (!torneo.groupDraw) {
-    contenedor.textContent = "Primero debes realizar el sorteo.";
+  if (torneo.groupDraw && Object.keys(torneo.groupDraw).length) {
+    contenedor.innerHTML = Object.entries(torneo.groupDraw).map(([grupo, equipos]) => {
+      const tabla = calcularTabla(equipos);
+      return `
+        <div class="card">
+          <h3>${escapar(grupo.startsWith("Grupo") ? grupo.toUpperCase() : "GRUPO " + grupo)}</h3>
+          ${htmlTabla(tabla)}
+        </div>
+      `;
+    }).join("");
+
+    const grupos = Object.entries(torneo.groupDraw);
+    if ($("semifinales")) {
+      if (grupos.length === 2) {
+        const a = calcularTabla(grupos[0][1]);
+        const b = calcularTabla(grupos[1][1]);
+        $("semifinales").innerHTML = `
+          <p>Semifinal 1: ${escapar(a[0]?.nombre || "Por definir")}
+          vs ${escapar(b[1]?.nombre || "Por definir")}</p>
+          <p>Semifinal 2: ${escapar(b[0]?.nombre || "Por definir")}
+          vs ${escapar(a[1]?.nombre || "Por definir")}</p>`;
+      } else {
+        $("semifinales").textContent = "Clasificarán los mejores equipos de cada grupo según el reglamento.";
+      }
+    }
     return;
   }
 
-  contenedor.innerHTML = ["A", "B"].map(grupo => {
-    const tabla = calcularTabla(torneo.groupDraw[grupo]);
-
-    return `
-      <div class="card">
-        <h3>GRUPO ${grupo}</h3>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Equipo</th>
-                <th>PJ</th>
-                <th>PG</th>
-                <th>PE</th>
-                <th>PP</th>
-                <th>GF</th>
-                <th>GC</th>
-                <th>DG</th>
-                <th>PTS</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${tabla.map(t => `
-                <tr>
-                  <td>${escapar(t.nombre)}</td>
-                  <td>${t.pj}</td>
-                  <td>${t.pg}</td>
-                  <td>${t.pe}</td>
-                  <td>${t.pp}</td>
-                  <td>${t.gf}</td>
-                  <td>${t.gc}</td>
-                  <td>${t.gf - t.gc}</td>
-                  <td><b>${t.pts}</b></td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
-  }).join("");
-
-  const a = calcularTabla(torneo.groupDraw.A);
-  const b = calcularTabla(torneo.groupDraw.B);
-
-  if ($("semifinales")) {
-    $("semifinales").innerHTML = `
-      <p>Semifinal 1: ${escapar(a[0]?.nombre || "Por definir")}
-      vs ${escapar(b[1]?.nombre || "Por definir")}</p>
-      <p>Semifinal 2: ${escapar(b[0]?.nombre || "Por definir")}
-      vs ${escapar(a[1]?.nombre || "Por definir")}</p>
-    `;
+  if (torneo.format === "eliminacion") {
+    contenedor.textContent = "La eliminación directa no utiliza tabla de posiciones.";
+    if ($("semifinales")) $("semifinales").textContent = "Las rondas se definen según los resultados de cada eliminatoria.";
+    return;
   }
+
+  contenedor.innerHTML = `
+    <div class="card">
+      <h3>Tabla general</h3>
+      ${htmlTabla(calcularTabla(torneo.teams))}
+    </div>`;
+  if ($("semifinales")) $("semifinales").textContent = "La clasificación se determina por la tabla general.";
 }
+
+function htmlTabla(tabla) {
+  return `<div class="table-wrap"><table>
+    <thead><tr><th>Equipo</th><th>PJ</th><th>PG</th><th>PE</th><th>PP</th><th>GF</th><th>GC</th><th>DG</th><th>PTS</th></tr></thead>
+    <tbody>${tabla.map(t => `<tr>
+      <td>${escapar(t.nombre)}</td><td>${t.pj}</td><td>${t.pg}</td>
+      <td>${t.pe}</td><td>${t.pp}</td><td>${t.gf}</td><td>${t.gc}</td>
+      <td>${t.dg}</td><td><b>${t.pts}</b></td>
+    </tr>`).join("")}</tbody>
+  </table></div>`;
+}
+
 
 function pintarResultados() {
   const contenedor = $("listaResultados");
@@ -254,19 +321,17 @@ function pintarCalendario() {
 
 function pintarEnVivo() {
   const video = $("video");
-  if (!video) return;
-
-  if (torneo.liveUrl) {
-    video.innerHTML = `
-      <iframe
-        src="${escapar(torneo.liveUrl)}"
-        title="Transmisión del torneo"
-        allowfullscreen>
-      </iframe>
-    `;
-  } else {
-    video.textContent = "La transmisión aparecerá aquí cuando se configure.";
+  if (video) {
+    if (torneo.liveUrl) {
+      video.innerHTML = `<iframe src="${escapar(torneo.liveUrl)}" title="Transmisión del torneo" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe>`;
+    } else {
+      video.innerHTML = '<div class="video-placeholder"><strong>▶ Próximamente</strong>La transmisión aparecerá aquí cuando se configure.</div>';
+    }
   }
+  const tiktok = $("enlaceTikTok");
+  const facebook = $("enlaceFacebook");
+  if (tiktok) tiktok.href = torneo.tiktokUrl || "https://www.tiktok.com/";
+  if (facebook) facebook.href = torneo.facebookUrl || "https://www.facebook.com/";
 }
 
 function llenarSelect(id) {
@@ -280,38 +345,39 @@ function llenarSelect(id) {
 
 function pintarEquiposAdmin() {
   const contenedor = $("editorEquipos");
-  if (!contenedor) return;
+  if (contenedor) {
+    contenedor.innerHTML = torneo.teams.map((e, i) => `
+      <div class="match">
+        <b>${escapar(e)}</b>
+        <button onclick="cambiarEquipo(${i})">Cambiar nombre</button>
+        <button onclick="eliminarEquipo(${i})">Eliminar</button>
+      </div>
+    `).join("");
+  }
 
-  contenedor.innerHTML = torneo.teams.map((e, i) => `
-    <div class="match">
-      <b>${escapar(e)}</b>
-      <button onclick="cambiarEquipo(${i})">Cambiar nombre</button>
-      <button onclick="eliminarEquipo(${i})">Eliminar</button>
-    </div>
-  `).join("");
+  ["local", "visitante", "proximoLocal", "proximoVisitante"].forEach(llenarSelect);
 
-  ["local", "visitante", "proximoLocal", "proximoVisitante"]
-    .forEach(llenarSelect);
+  if ($("cantidadEquiposConfig")) $("cantidadEquiposConfig").value = torneo.teams.length;
+  if ($("formatoTorneo")) $("formatoTorneo").value = torneo.format;
+  if ($("cantidadGrupos")) $("cantidadGrupos").value = torneo.groupCount;
+  if ($("urlYouTube")) $("urlYouTube").value = torneo.liveUrl || "";
+  if ($("urlTikTok")) $("urlTikTok").value = torneo.tiktokUrl || "";
+  if ($("urlFacebook")) $("urlFacebook").value = torneo.facebookUrl || "";
 }
 
 function pintarCronometro() {
   const el = $("cronometro");
-  if (!el) return;
+  if (!el || !torneo) return;
 
-  let segundos = Number(torneo.timer.seconds) || 0;
-
-  if (torneo.timer.active && torneo.timer.startedAt) {
-    segundos += Math.max(
-      0,
-      Math.floor((Date.now() - torneo.timer.startedAt) / 1000)
-    );
-  }
-
+  const segundos = segundosActuales();
   const minutos = String(Math.floor(segundos / 60)).padStart(2, "0");
   const resto = String(segundos % 60).padStart(2, "0");
-
   el.textContent = `${minutos}:${resto}`;
+
+  const estado = $("estadoCronometro");
+  if (estado) estado.textContent = torneo.timer.active ? "EN JUEGO" : "PAUSADO";
 }
+
 
 function mostrarAdministrador() {
   const panel = $("panelAdmin");
@@ -390,29 +456,61 @@ window.iniciarSesion = async function () {
 
 window.cerrarSesion = () => signOut(auth);
 
-window.realizarSorteo = async function () {
+window.aplicarConfiguracionTorneo = async function () {
   if (!administrador) return;
 
-  if (torneo.teams.length !== 8) {
-    alert("El sorteo necesita exactamente ocho equipos.");
+  const cantidad = Number($("cantidadEquiposConfig")?.value);
+  const formato = $("formatoTorneo")?.value || "grupos";
+  if (!Number.isInteger(cantidad) || cantidad < 2 || cantidad > 64) {
+    alert("El número de equipos debe estar entre 2 y 64.");
+    return;
+  }
+  if (formato === "grupos" && cantidad < 4) {
+    alert("El formato de grupos con semifinales necesita al menos 4 equipos.");
+    return;
+  }
+  if (!["todos", "ida_vuelta", "grupos", "eliminacion"].includes(formato)) {
+    alert("Selecciona un formato válido.");
+    return;
+  }
+  const gruposElegidos = Number($("cantidadGrupos")?.value || 2);
+  if (formato === "grupos" && (!Number.isInteger(gruposElegidos) || gruposElegidos < 2 || gruposElegidos > Math.min(8, cantidad))) {
+    alert("La cantidad de grupos debe estar entre 2 y 8 y no superar el número de equipos.");
+    return;
+  }
+  if (!confirm("Aplicar la configuración reiniciará el calendario y los resultados actuales. ¿Deseas continuar?")) return;
+
+  const equipos = [...torneo.teams];
+  while (equipos.length < cantidad) equipos.push(`Equipo ${equipos.length + 1}`);
+  torneo.teams = equipos.slice(0, cantidad);
+  torneo.format = formato;
+  torneo.groupCount = formato === "grupos" ? gruposElegidos : 0;
+  torneo.matches = [];
+  torneo.groupDraw = formato === "grupos"
+    ? crearGrupos(torneo.teams, torneo.groupCount)
+    : null;
+
+  generarCalendario();
+  renderizar();
+  await guardar();
+  mensaje("Configuración del torneo guardada.");
+};
+
+window.realizarSorteo = async function () {
+  if (!administrador) return;
+  if (torneo.format !== "grupos") {
+    alert("El sorteo por grupos solo se utiliza en el formato de grupos y eliminatorias.");
     return;
   }
 
-  const equipos = [...torneo.teams];
-
-  for (let i = equipos.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [equipos[i], equipos[j]] = [equipos[j], equipos[i]];
-  }
-
-  torneo.groupDraw = {
-    A: equipos.slice(0, 4),
-    B: equipos.slice(4, 8)
-  };
-
+  const cantidad = Math.min(Math.max(2, Number(torneo.groupCount) || 2), torneo.teams.length);
+  torneo.groupDraw = crearGrupos(torneo.teams, cantidad);
+  torneo.matches = [];
+  generarCalendario();
   renderizar();
   await guardar();
 };
+
 
 window.agregarEquipo = async function () {
   const nombre = $("nuevoEquipo").value.trim();
@@ -422,12 +520,20 @@ window.agregarEquipo = async function () {
     return;
   }
 
+  if (torneo.teams.length >= 64) {
+    alert("El máximo permitido es de 64 equipos.");
+    return;
+  }
   if (torneo.teams.some(e => e.toLowerCase() === nombre.toLowerCase())) {
     alert("Ese equipo ya existe.");
     return;
   }
 
   torneo.teams.push(nombre);
+  if (torneo.format === "grupos") {
+    torneo.groupDraw = crearGrupos(torneo.teams, Math.min(torneo.groupCount || 2, torneo.teams.length));
+  }
+  generarCalendario();
   $("nuevoEquipo").value = "";
 
   renderizar();
@@ -462,10 +568,8 @@ window.cambiarEquipo = async function (indice) {
   });
 
   if (torneo.groupDraw) {
-    ["A", "B"].forEach(g => {
-      torneo.groupDraw[g] = torneo.groupDraw[g].map(
-        e => e === anterior ? nombre : e
-      );
+    Object.keys(torneo.groupDraw).forEach(g => {
+      torneo.groupDraw[g] = torneo.groupDraw[g].map(e => e === anterior ? nombre : e);
     });
   }
 
@@ -488,13 +592,13 @@ window.eliminarEquipo = async function (indice) {
     p => p.home !== nombre && p.away !== nombre
   );
 
-  if (torneo.groupDraw) {
-    ["A", "B"].forEach(g => {
-      torneo.groupDraw[g] = torneo.groupDraw[g].filter(
-        e => e !== nombre
-      );
-    });
+  if (torneo.format === "grupos" && torneo.teams.length >= 2) {
+    torneo.groupCount = Math.min(torneo.groupCount || 2, torneo.teams.length);
+    torneo.groupDraw = crearGrupos(torneo.teams, torneo.groupCount);
+  } else {
+    torneo.groupDraw = null;
   }
+  generarCalendario();
 
   renderizar();
   await guardar();
@@ -560,26 +664,26 @@ window.agregarProximo = async function () {
 };
 
 window.guardarTransmision = async function () {
-  const url = $("urlYouTube").value.trim();
-
+  if (!administrador) return;
+  const youtube = $("urlYouTube")?.value.trim() || "";
+  const tiktok = $("urlTikTok")?.value.trim() || "";
+  const facebook = $("urlFacebook")?.value.trim() || "";
+  const validar = (valor, dominios, etiqueta, rutaOpcional = false) => {
+    if (!valor) return "";
+    const u = new URL(valor);
+    if (!dominios.includes(u.hostname.toLowerCase())) throw new Error("Revisa el enlace de " + etiqueta + ".");
+    if (etiqueta === "YouTube" && !u.pathname.startsWith("/embed/")) throw new Error("YouTube debe usar un enlace /embed/.");
+    return u.href;
+  };
   try {
-    const u = new URL(url);
-
-    if (
-      !["youtube.com", "www.youtube.com", "www.youtube-nocookie.com"]
-        .includes(u.hostname) ||
-      !u.pathname.startsWith("/embed/")
-    ) {
-      throw new Error();
-    }
-
-    torneo.liveUrl = u.href;
-
+    torneo.liveUrl = validar(youtube, ["youtube.com", "www.youtube.com", "www.youtube-nocookie.com"], "YouTube");
+    torneo.tiktokUrl = validar(tiktok, ["tiktok.com", "www.tiktok.com", "vm.tiktok.com"], "TikTok");
+    torneo.facebookUrl = validar(facebook, ["facebook.com", "www.facebook.com", "fb.watch", "m.facebook.com"], "Facebook");
     renderizar();
     await guardar();
-
-  } catch {
-    alert("Introduce un enlace de YouTube Embed válido.");
+    mensaje("Enlaces de transmisión guardados.");
+  } catch (error) {
+    alert(error.message || "Uno de los enlaces no es válido.");
   }
 };
 

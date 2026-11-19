@@ -1,0 +1,41 @@
+TORNEO RELÁMPAGO SAN JOSÉ DEL GACAL
+PROYECTO UNIFICADO - VERSIÓN MULTIPÁGINA
+
+ARCHIVOS
+- index.html: portada y resumen
+- sorteo.html: sorteo y grupos
+- posiciones.html: tablas y clasificación
+- calendario.html: próximos partidos
+- resultados.html: marcadores registrados
+- envivo.html: reproductor YouTube y enlaces a TikTok/Facebook
+- admin.html: configuración y controles de administrador
+- estilos.css: diseño visual compartido, basado en el primer código
+- firebase.js: conexión al proyecto Firebase original
+- app.js: lógica común de todas las páginas
+
+FUNCIONES INCLUIDAS
+- Conserva el proyecto Firebase y el UID administrador suministrados originalmente.
+- Lectura pública y escritura solo para la cuenta administradora autorizada (las reglas de Firebase deben mantenerse así).
+- Elección de 2 a 64 equipos.
+- Formatos: todos contra todos, ida y vuelta, grupos y eliminatorias, eliminación directa.
+- Configuración de cantidad de grupos (2 a 8).
+- Sorteo aleatorio, edición y eliminación de equipos.
+- Registro de resultados, tabla de posiciones y calendario.
+- Cronómetro compartido visible en todas las páginas.
+- Enlace de YouTube Embed y enlaces externos a TikTok/Facebook.
+
+ANTES DE REEMPLAZAR TU PROYECTO
+1. Haz una copia de seguridad de la carpeta que ya tienes.
+2. Descomprime esta carpeta y revisa los archivos.
+3. Prueba primero en local y confirma que Firebase conecta correctamente.
+4. No cambies las reglas de Firebase para permitir escrituras públicas. Mantén la escritura limitada al UID administrador.
+5. Cambiar número/formato reinicia calendario y resultados después de una confirmación.
+6. Publica en GitHub Pages solo después de probarlo.
+
+PUBLICAR CAMBIOS
+git add .
+git commit -m "Unificar codigo del torneo"
+git push
+
+NOTA
+El código se ha integrado a partir del primer HTML de una sola página y la versión multipágina posterior. Se recomienda probar inicio de sesión, guardado y sincronización antes de usarlo en un torneo real.
