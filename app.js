@@ -200,18 +200,28 @@ function partidosTodosContraTodos(equipos, idaVuelta = false, grupo = "General")
 function generarCalendario() {
   torneo.upcoming = [];
 
-  if (torneo.format === "todos" ||
-      torneo.format === "ida_vuelta") {
+  if (torneo.format === "todos") {
     torneo.upcoming = partidosTodosContraTodos(
       torneo.teams,
-      torneo.format === "ida_vuelta"
+      false
+    );
+  }
+
+  else if (torneo.format === "ida_vuelta") {
+    torneo.upcoming = partidosTodosContraTodos(
+      torneo.teams,
+      true
     );
   }
 
   else if (torneo.format === "grupos" && torneo.groupDraw) {
     Object.entries(torneo.groupDraw).forEach(([grupo, equipos]) => {
       torneo.upcoming.push(
-        ...partidosTodosContraTodos(equipos, false, grupo)
+        ...partidosTodosContraTodos(
+          equipos,
+          false,
+          grupo
+        )
       );
     });
   }
@@ -542,9 +552,12 @@ window.realizarSorteo = async function () {
   const cantidad = Math.min(Math.max(2, Number(torneo.groupCount) || 2), torneo.teams.length);
   torneo.groupDraw = crearGrupos(torneo.teams, cantidad);
   torneo.matches = [];
-  renderizar();
-  await guardar();
-};
+  generarCalendario();
+
+renderizar();
+await guardar();
+
+alert("Sorteo y calendario generados correctamente.");
 
 
 window.agregarEquipo = async function () {
