@@ -41,19 +41,15 @@ function normalizar(datos) {
     groupDraw: base.groupDraw || null,
     matches: Array.isArray(base.matches) ? base.matches : [],
     upcoming: Array.isArray(base.upcoming) ? base.upcoming : [],
-    liveUrl: base.liveUrl || "",
-    tiktokUrl: base.tiktokUrl || "",
-    facebookUrl: base.facebookUrl || "",
     format: base.format || "grupos",
-    groupCount: Number(base.groupCount) || 2,
-    timer: {
-      seconds: Number(base.timer?.seconds) || 0,
-      startedAt: base.timer?.startedAt || null,
-      active: !!base.timer?.active
+    liveUrl: base.liveUrl || "",
+    timer: base.timer || {
+      seconds: 0,
+      startedAt: null,
+      active: false
     }
   };
 }
-
 
 async function guardar() {
   if (!administrador || auth.currentUser?.uid !== ADMIN_UID) {
@@ -126,179 +122,111 @@ function calcularTabla(equipos) {
   );
 }
 
-
-function mezclar(lista) {
-  const copia = [...lista];
-  for (let i = copia.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copia[i], copia[j]] = [copia[j], copia[i]];
-  }
-  return copia;
-}
-
-function nombreGrupo(i) {
-  return `Grupo ${i + 1}`;
-}
-
-function crearGrupos(equipos, cantidad) {
-  const grupos = {};
-  for (let i = 0; i < cantidad; i++) grupos[nombreGrupo(i)] = [];
-  mezclar(equipos).forEach((equipo, i) => {
-    grupos[nombreGrupo(i % cantidad)].push(equipo);
-  });
-  return grupos;
-}
-
-function partidosTodosContraTodos(equipos, idaVuelta = false, grupo = "General") {
-  const lista = [...equipos];
-  if (lista.length % 2 !== 0) lista.push(null);
-
-  const cantidad = lista.length;
-  const jornadas = [];
-
-  for (let ronda = 0; ronda < cantidad - 1; ronda++) {
-    const partidos = [];
-
-    for (let i = 0; i < cantidad / 2; i++) {
-      const local = lista[i];
-      const visitante = lista[cantidad - 1 - i];
-
-      if (local && visitante) {
-        partidos.push({
-          id: `${grupo}-${ronda + 1}-${i + 1}`,
-          group: grupo,
-          round: ronda + 1,
-          home: ronda % 2 === 0 ? local : visitante,
-          away: ronda % 2 === 0 ? visitante : local,
-          date: "",
-          time: ""
-        });
-      }
-    }
-
-    jornadas.push(partidos);
-    lista.splice(1, 0, lista.pop());
+function pintarInicio() {
+  const formato = $("formatoActual");
+  if (formato) {
+    const nombres = {
+      todos: "Todos contra todos",
+      ida_vuelta: "Todos contra todos (ida y vuelta)",
+      grupos: "Fase de grupos (A y B)",
+      eliminacion: "Eliminación directa"
+    };
+    formato.textContent = nombres[torneo.format] || "Por configurar";
   }
 
-  let fixture = jornadas.flat();
-
-  if (idaVuelta) {
-    const vuelta = fixture.map((p, i) => ({
-      ...p,
-      id: `${p.id}-vuelta-${i + 1}`,
-      round: p.round + jornadas.length,
-      home: p.away,
-      away: p.home
-    }));
-
-    fixture = [...fixture, ...vuelta];
-  }
-
-  return fixture;
-}
-
-function generarCalendario() {
-  torneo.upcoming = [];
-
-  if (torneo.format === "todos") {
-    torneo.upcoming = partidosTodosContraTodos(
-      torneo.teams,
-      false
+  if ($("cantidadEquipos")) {
+    $("cantidadEquipos").textContent = torneo.teams.length;
+    $("cantidadPartidos").textContent = torneo.matches.length;
+    $("cantidadGoles").textContent = torneo.matches.reduce(
+      (s, p) => s + Number(p.hg) + Number(p.ag), 0
     );
   }
-
-  else if (torneo.format === "ida_vuelta") {
-    torneo.upcoming = partidosTodosContraTodos(
-      torneo.teams,
-      true
-    );
-  }
-
-  else if (torneo.format === "grupos" && torneo.groupDraw) {
-    Object.entries(torneo.groupDraw).forEach(([grupo, equipos]) => {
-      torneo.upcoming.push(
-        ...partidosTodosContraTodos(
-          equipos,
-          false,
-          grupo
-        )
-      );
-    });
-  }
-
-  else if (torneo.format === "eliminacion") {
-    const equipos = mezclar(torneo.teams);
-
-    for (let i = 0; i < equipos.length; i += 2) {
-      torneo.upcoming.push({
-        id: `eliminacion-${i + 1}`,
-        group: "Eliminación",
-        round: 1,
-        home: equipos[i],
-        away: equipos[i + 1] || "Pasa directamente",
-        date: "",
-        time: ""
-      });
-    }
-  }
 }
+
+function pintarSorteo() {
+  const contenedor = $("grupos");
+  if (!contenedor) return;
+
+  if (!torneo.groupDraw) {
+    contenedor.textContent = "Todavía no se ha realizado el sorteo.";
+    return;
+  }
+
+  contenedor.innerHTML = ["A", "B"].map(grupo => `
+    <div class="draw-group">
+      <h3>GRUPO ${grupo}</h3>
+      <ol>
+        ${torneo.groupDraw[grupo].map(equipo =>
+          `<li>${escapar(equipo)}</li>`
+        ).join("")}
+      </ol>
+    </div>
+  `).join("");
+}
+
 function pintarPosiciones() {
   const contenedor = $("tablas");
   if (!contenedor) return;
 
-  if (torneo.groupDraw && Object.keys(torneo.groupDraw).length) {
-    contenedor.innerHTML = Object.entries(torneo.groupDraw).map(([grupo, equipos]) => {
-      const tabla = calcularTabla(equipos);
-      return `
-        <div class="card">
-          <h3>${escapar(grupo.startsWith("Grupo") ? grupo.toUpperCase() : "GRUPO " + grupo)}</h3>
-          ${htmlTabla(tabla)}
+  if (!torneo.groupDraw) {
+    contenedor.textContent = "Primero debes realizar el sorteo.";
+    return;
+  }
+
+  contenedor.innerHTML = ["A", "B"].map(grupo => {
+    const tabla = calcularTabla(torneo.groupDraw[grupo]);
+
+    return `
+      <div class="card">
+        <h3>GRUPO ${grupo}</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Equipo</th>
+                <th>PJ</th>
+                <th>PG</th>
+                <th>PE</th>
+                <th>PP</th>
+                <th>GF</th>
+                <th>GC</th>
+                <th>DG</th>
+                <th>PTS</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tabla.map(t => `
+                <tr>
+                  <td>${escapar(t.nombre)}</td>
+                  <td>${t.pj}</td>
+                  <td>${t.pg}</td>
+                  <td>${t.pe}</td>
+                  <td>${t.pp}</td>
+                  <td>${t.gf}</td>
+                  <td>${t.gc}</td>
+                  <td>${t.gf - t.gc}</td>
+                  <td><b>${t.pts}</b></td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
         </div>
-      `;
-    }).join("");
+      </div>
+    `;
+  }).join("");
 
-    const grupos = Object.entries(torneo.groupDraw);
-    if ($("semifinales")) {
-      if (grupos.length === 2) {
-        const a = calcularTabla(grupos[0][1]);
-        const b = calcularTabla(grupos[1][1]);
-        $("semifinales").innerHTML = `
-          <p>Semifinal 1: ${escapar(a[0]?.nombre || "Por definir")}
-          vs ${escapar(b[1]?.nombre || "Por definir")}</p>
-          <p>Semifinal 2: ${escapar(b[0]?.nombre || "Por definir")}
-          vs ${escapar(a[1]?.nombre || "Por definir")}</p>`;
-      } else {
-        $("semifinales").textContent = "Clasificarán los mejores equipos de cada grupo según el reglamento.";
-      }
-    }
-    return;
+  const a = calcularTabla(torneo.groupDraw.A);
+  const b = calcularTabla(torneo.groupDraw.B);
+
+  if ($("semifinales")) {
+    $("semifinales").innerHTML = `
+      <p>Semifinal 1: ${escapar(a[0]?.nombre || "Por definir")}
+      vs ${escapar(b[1]?.nombre || "Por definir")}</p>
+      <p>Semifinal 2: ${escapar(b[0]?.nombre || "Por definir")}
+      vs ${escapar(a[1]?.nombre || "Por definir")}</p>
+    `;
   }
-
-  if (torneo.format === "eliminacion") {
-    contenedor.textContent = "La eliminación directa no utiliza tabla de posiciones.";
-    if ($("semifinales")) $("semifinales").textContent = "Las rondas se definen según los resultados de cada eliminatoria.";
-    return;
-  }
-
-  contenedor.innerHTML = `
-    <div class="card">
-      <h3>Tabla general</h3>
-      ${htmlTabla(calcularTabla(torneo.teams))}
-    </div>`;
-  if ($("semifinales")) $("semifinales").textContent = "La clasificación se determina por la tabla general.";
 }
-
-function htmlTabla(tabla) {
-  return `<div class="table-wrap"><table>
-    <thead><tr><th>Equipo</th><th>PJ</th><th>PG</th><th>PE</th><th>PP</th><th>GF</th><th>GC</th><th>DG</th><th>PTS</th></tr></thead>
-    <tbody>${tabla.map(t => `<tr>
-      <td>${escapar(t.nombre)}</td><td>${t.pj}</td><td>${t.pg}</td>
-      <td>${t.pe}</td><td>${t.pp}</td><td>${t.gf}</td><td>${t.gc}</td>
-      <td>${t.dg}</td><td><b>${t.pts}</b></td>
-    </tr>`).join("")}</tbody>
-  </table></div>`;
-}
-
 
 function pintarResultados() {
   const contenedor = $("listaResultados");
@@ -317,64 +245,40 @@ function pintarResultados() {
     `).join("")
     : "Todavía no hay resultados registrados.";
 }
+
 function pintarCalendario() {
-  const cont = $("listaProximos");
-  if (!cont) return;
+  const contenedor = $("listaProximos");
+  if (!contenedor) return;
 
-  if (!torneo.upcoming.length) {
-    cont.textContent = "Todavía no hay partidos programados.";
-    return;
-  }
-
-  const jornadas = {};
-
-  torneo.upcoming.forEach(p => {
-    const nombre = p.round || 1;
-    const grupo = p.group || "General";
-    const clave = `${grupo} - Jornada ${nombre}`;
-
-    if (!jornadas[clave]) jornadas[clave] = [];
-    jornadas[clave].push(p);
-  });
-
-  cont.innerHTML = Object.entries(jornadas).map(([jornada, partidos]) => `
-    <section class="card">
-      <h3>${escapar(jornada)}</h3>
-
-      ${partidos.map(p => `
-        <article class="match">
-          <div class="score">
-            <span>${escapar(p.home)}</span>
-            <b>VS</b>
-            <span>${escapar(p.away)}</span>
-          </div>
-
-          <div class="muted">
-            Fecha: ${escapar(p.date || "Por definir")}
-          </div>
-
-          <div class="muted">
-            Hora: ${escapar(p.time || "Por definir")}
-          </div>
-        </article>
-      `).join("")}
-    </section>
-  `).join("");
+  contenedor.innerHTML = torneo.upcoming.length
+    ? torneo.upcoming.map(p => `
+      <div class="match">
+        <div class="muted">${escapar(p.date || "Por programar")}</div>
+        <div class="score">
+          <span>${escapar(p.home)}</span>
+          <b>VS</b>
+          <span>${escapar(p.away)}</span>
+        </div>
+      </div>
+    `).join("")
+    : "No hay partidos programados.";
 }
 
 function pintarEnVivo() {
   const video = $("video");
-  if (video) {
-    if (torneo.liveUrl) {
-      video.innerHTML = `<iframe src="${escapar(torneo.liveUrl)}" title="Transmisión del torneo" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe>`;
-    } else {
-      video.innerHTML = '<div class="video-placeholder"><strong>▶ Próximamente</strong>La transmisión aparecerá aquí cuando se configure.</div>';
-    }
+  if (!video) return;
+
+  if (torneo.liveUrl) {
+    video.innerHTML = `
+      <iframe
+        src="${escapar(torneo.liveUrl)}"
+        title="Transmisión del torneo"
+        allowfullscreen>
+      </iframe>
+    `;
+  } else {
+    video.textContent = "La transmisión aparecerá aquí cuando se configure.";
   }
-  const tiktok = $("enlaceTikTok");
-  const facebook = $("enlaceFacebook");
-  if (tiktok) tiktok.href = torneo.tiktokUrl || "https://www.tiktok.com/";
-  if (facebook) facebook.href = torneo.facebookUrl || "https://www.facebook.com/";
 }
 
 function llenarSelect(id) {
@@ -388,39 +292,38 @@ function llenarSelect(id) {
 
 function pintarEquiposAdmin() {
   const contenedor = $("editorEquipos");
-  if (contenedor) {
-    contenedor.innerHTML = torneo.teams.map((e, i) => `
-      <div class="match">
-        <b>${escapar(e)}</b>
-        <button onclick="cambiarEquipo(${i})">Cambiar nombre</button>
-        <button onclick="eliminarEquipo(${i})">Eliminar</button>
-      </div>
-    `).join("");
-  }
+  if (!contenedor) return;
 
-  ["local", "visitante", "proximoLocal", "proximoVisitante"].forEach(llenarSelect);
+  contenedor.innerHTML = torneo.teams.map((e, i) => `
+    <div class="match">
+      <b>${escapar(e)}</b>
+      <button onclick="cambiarEquipo(${i})">Cambiar nombre</button>
+      <button onclick="eliminarEquipo(${i})">Eliminar</button>
+    </div>
+  `).join("");
 
-  if ($("cantidadEquiposConfig")) $("cantidadEquiposConfig").value = torneo.teams.length;
-  if ($("formatoTorneo")) $("formatoTorneo").value = torneo.format;
-  if ($("cantidadGrupos")) $("cantidadGrupos").value = torneo.groupCount;
-  if ($("urlYouTube")) $("urlYouTube").value = torneo.liveUrl || "";
-  if ($("urlTikTok")) $("urlTikTok").value = torneo.tiktokUrl || "";
-  if ($("urlFacebook")) $("urlFacebook").value = torneo.facebookUrl || "";
+  ["local", "visitante", "proximoLocal", "proximoVisitante"]
+    .forEach(llenarSelect);
 }
 
 function pintarCronometro() {
   const el = $("cronometro");
-  if (!el || !torneo) return;
+  if (!el) return;
 
-  const segundos = segundosActuales();
+  let segundos = Number(torneo.timer.seconds) || 0;
+
+  if (torneo.timer.active && torneo.timer.startedAt) {
+    segundos += Math.max(
+      0,
+      Math.floor((Date.now() - torneo.timer.startedAt) / 1000)
+    );
+  }
+
   const minutos = String(Math.floor(segundos / 60)).padStart(2, "0");
   const resto = String(segundos % 60).padStart(2, "0");
+
   el.textContent = `${minutos}:${resto}`;
-
-  const estado = $("estadoCronometro");
-  if (estado) estado.textContent = torneo.timer.active ? "EN JUEGO" : "PAUSADO";
 }
-
 
 function mostrarAdministrador() {
   const panel = $("panelAdmin");
@@ -431,8 +334,6 @@ function mostrarAdministrador() {
 }
 
 function renderizar() {
-  if (!torneo) return;
-
   pintarInicio();
   pintarSorteo();
   pintarPosiciones();
@@ -440,10 +341,145 @@ function renderizar() {
   pintarCalendario();
   pintarEnVivo();
   pintarEquiposAdmin();
-  pintarEditorFixture();
   pintarCronometro();
   mostrarAdministrador();
 }
+
+
+function crearPartidosLiga(equipos, grupo = "General", idaVuelta = false) {
+  const lista = [...equipos];
+  if (lista.length % 2 !== 0) lista.push(null);
+
+  const total = lista.length;
+  const jornadas = [];
+
+  for (let ronda = 0; ronda < total - 1; ronda++) {
+    const partidos = [];
+
+    for (let i = 0; i < total / 2; i++) {
+      let local = lista[i];
+      let visitante = lista[total - 1 - i];
+
+      if (local && visitante) {
+        if (ronda % 2 === 1) [local, visitante] = [visitante, local];
+        partidos.push({
+          home: local,
+          away: visitante,
+          date: `${grupo} · Jornada ${ronda + 1}`
+        });
+      }
+    }
+
+    jornadas.push(partidos);
+    lista.splice(1, 0, lista.pop());
+  }
+
+  let fixture = jornadas.flat();
+
+  if (idaVuelta) {
+    fixture = fixture.concat(fixture.map(p => ({
+      home: p.away,
+      away: p.home,
+      date: `${grupo} · Vuelta`
+    })));
+  }
+
+  return fixture;
+}
+
+function generarCalendarioAutomatico() {
+  torneo.upcoming = [];
+
+  if (torneo.format === "todos") {
+    torneo.upcoming = crearPartidosLiga(torneo.teams, "Liga", false);
+  } else if (torneo.format === "ida_vuelta") {
+    torneo.upcoming = crearPartidosLiga(torneo.teams, "Liga", true);
+  } else if (torneo.format === "grupos") {
+    if (!torneo.groupDraw || !torneo.groupDraw.A || !torneo.groupDraw.B) {
+      throw new Error("Primero realiza el sorteo de los grupos A y B.");
+    }
+    torneo.upcoming = [
+      ...crearPartidosLiga(torneo.groupDraw.A, "Grupo A"),
+      ...crearPartidosLiga(torneo.groupDraw.B, "Grupo B")
+    ];
+  } else if (torneo.format === "eliminacion") {
+    const equipos = [...torneo.teams];
+    for (let i = equipos.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [equipos[i], equipos[j]] = [equipos[j], equipos[i]];
+    }
+    for (let i = 0; i < equipos.length; i += 2) {
+      torneo.upcoming.push({
+        home: equipos[i],
+        away: equipos[i + 1] || "Pasa directamente",
+        date: "Eliminación · Primera ronda"
+      });
+    }
+  }
+}
+
+window.aplicarConfiguracionTorneo = async function () {
+  if (!administrador) return;
+
+  const cantidad = Number($("cantidadEquiposConfig")?.value || torneo.teams.length);
+  const formato = $("formatoTorneo")?.value || "grupos";
+
+  if (!Number.isInteger(cantidad) || cantidad < 2 || cantidad > 64) {
+    alert("El número de equipos debe estar entre 2 y 64.");
+    return;
+  }
+
+  if (formato === "grupos" && cantidad < 4) {
+    alert("Para jugar en dos grupos se necesitan al menos cuatro equipos.");
+    return;
+  }
+
+  if (formato === "grupos" && cantidad % 2 !== 0) {
+    alert("Para repartir los equipos en dos grupos iguales, utiliza una cantidad par.");
+    return;
+  }
+
+  const iniciales = datosIniciales().teams;
+  const nuevos = torneo.teams.slice(0, cantidad);
+
+  for (const nombre of iniciales) {
+    if (nuevos.length >= cantidad) break;
+    if (!nuevos.includes(nombre)) nuevos.push(nombre);
+  }
+
+  let numero = 1;
+  while (nuevos.length < cantidad) {
+    nuevos.push(`Equipo ${numero++}`);
+  }
+
+  torneo.teams = nuevos;
+  torneo.format = formato;
+  torneo.matches = [];
+  torneo.groupDraw = null;
+  torneo.upcoming = [];
+
+  if (formato === "grupos") {
+    const mezcla = [...nuevos];
+    for (let i = mezcla.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [mezcla[i], mezcla[j]] = [mezcla[j], mezcla[i]];
+    }
+    const mitad = mezcla.length / 2;
+    torneo.groupDraw = {
+      A: mezcla.slice(0, mitad),
+      B: mezcla.slice(mitad)
+    };
+  }
+
+  try {
+    generarCalendarioAutomatico();
+    renderizar();
+    await guardar();
+    alert("Configuración y calendario generados correctamente.");
+  } catch (error) {
+    alert(error.message);
+  }
+};
 
 onAuthStateChanged(auth, async usuario => {
   administrador = !!usuario && usuario.uid === ADMIN_UID;
@@ -502,63 +538,34 @@ window.iniciarSesion = async function () {
 
 window.cerrarSesion = () => signOut(auth);
 
-window.aplicarConfiguracionTorneo = async function () {
-  if (!administrador) return;
-
-  const cantidad = Number($("cantidadEquiposConfig")?.value);
-  const formato = $("formatoTorneo")?.value || "grupos";
-  if (!Number.isInteger(cantidad) || cantidad < 2 || cantidad > 64) {
-    alert("El número de equipos debe estar entre 2 y 64.");
-    return;
-  }
-  if (formato === "grupos" && cantidad < 4) {
-    alert("El formato de grupos con semifinales necesita al menos 4 equipos.");
-    return;
-  }
-  if (!["todos", "ida_vuelta", "grupos", "eliminacion"].includes(formato)) {
-    alert("Selecciona un formato válido.");
-    return;
-  }
-  const gruposElegidos = Number($("cantidadGrupos")?.value || 2);
-  if (formato === "grupos" && (!Number.isInteger(gruposElegidos) || gruposElegidos < 2 || gruposElegidos > Math.min(8, cantidad))) {
-    alert("La cantidad de grupos debe estar entre 2 y 8 y no superar el número de equipos.");
-    return;
-  }
-  if (!confirm("Aplicar la configuración reiniciará el calendario y los resultados actuales. ¿Deseas continuar?")) return;
-
-  const equipos = [...torneo.teams];
-  while (equipos.length < cantidad) equipos.push(`Equipo ${equipos.length + 1}`);
-  torneo.teams = equipos.slice(0, cantidad);
-  torneo.format = formato;
-  torneo.groupCount = formato === "grupos" ? gruposElegidos : 0;
-  torneo.matches = [];
-  torneo.groupDraw = formato === "grupos"
-    ? crearGrupos(torneo.teams, torneo.groupCount)
-    : null;
-
-  generarCalendario();
-  renderizar();
-  await guardar();
-  mensaje("Configuración del torneo guardada.");
-};
-
 window.realizarSorteo = async function () {
   if (!administrador) return;
-  if (torneo.format !== "grupos") {
-    alert("El sorteo por grupos solo se utiliza en el formato de grupos y eliminatorias.");
+
+  if (torneo.teams.length < 4 || torneo.teams.length % 2 !== 0) {
+    alert("Para sortear dos grupos se necesitan al menos cuatro equipos y una cantidad par.");
     return;
   }
 
-  const cantidad = Math.min(Math.max(2, Number(torneo.groupCount) || 2), torneo.teams.length);
-  torneo.groupDraw = crearGrupos(torneo.teams, cantidad);
-  torneo.matches = [];
-  generarCalendario();
+  const equipos = [...torneo.teams];
 
-renderizar();
-await guardar();
+  for (let i = equipos.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [equipos[i], equipos[j]] = [equipos[j], equipos[i]];
+  }
 
-alert("Sorteo y calendario generados correctamente.");
+  torneo.groupDraw = {
+    A: equipos.slice(0, equipos.length / 2),
+    B: equipos.slice(equipos.length / 2)
+  };
 
+  if (torneo.format === "grupos") {
+    generarCalendarioAutomatico();
+  }
+
+  renderizar();
+  await guardar();
+  alert("Sorteo y calendario actualizados.");
+};
 
 window.agregarEquipo = async function () {
   const nombre = $("nuevoEquipo").value.trim();
@@ -568,20 +575,12 @@ window.agregarEquipo = async function () {
     return;
   }
 
-  if (torneo.teams.length >= 64) {
-    alert("El máximo permitido es de 64 equipos.");
-    return;
-  }
   if (torneo.teams.some(e => e.toLowerCase() === nombre.toLowerCase())) {
     alert("Ese equipo ya existe.");
     return;
   }
 
   torneo.teams.push(nombre);
-  if (torneo.format === "grupos") {
-    torneo.groupDraw = crearGrupos(torneo.teams, Math.min(torneo.groupCount || 2, torneo.teams.length));
-  }
-  generarCalendario();
   $("nuevoEquipo").value = "";
 
   renderizar();
@@ -616,8 +615,10 @@ window.cambiarEquipo = async function (indice) {
   });
 
   if (torneo.groupDraw) {
-    Object.keys(torneo.groupDraw).forEach(g => {
-      torneo.groupDraw[g] = torneo.groupDraw[g].map(e => e === anterior ? nombre : e);
+    ["A", "B"].forEach(g => {
+      torneo.groupDraw[g] = torneo.groupDraw[g].map(
+        e => e === anterior ? nombre : e
+      );
     });
   }
 
@@ -640,13 +641,13 @@ window.eliminarEquipo = async function (indice) {
     p => p.home !== nombre && p.away !== nombre
   );
 
-  if (torneo.format === "grupos" && torneo.teams.length >= 2) {
-    torneo.groupCount = Math.min(torneo.groupCount || 2, torneo.teams.length);
-    torneo.groupDraw = crearGrupos(torneo.teams, torneo.groupCount);
-  } else {
-    torneo.groupDraw = null;
+  if (torneo.groupDraw) {
+    ["A", "B"].forEach(g => {
+      torneo.groupDraw[g] = torneo.groupDraw[g].filter(
+        e => e !== nombre
+      );
+    });
   }
-  generarCalendario();
 
   renderizar();
   await guardar();
@@ -688,140 +689,6 @@ window.registrarResultado = async function () {
   renderizar();
   await guardar();
 };
-function pintarCalendarioAdmin() {
-  const cont = $("editorCalendario");
-  if (!cont || !administrador) return;
-
-  if (!torneo.upcoming.length) {
-    cont.textContent = "Todavía no hay partidos en el fixture.";
-    return;
-  }
-
-  cont.innerHTML = torneo.upcoming.map((p, i) => `
-    <article class="match">
-      <div class="muted">
-        ${escapar(p.group || "General")} -
-        ${escapar(p.date || "Por programar")}
-      </div>
-
-      <div class="score">
-        <span>${escapar(p.home)}</span>
-        <b>VS</b>
-        <span>${escapar(p.away)}</span>
-      </div>
-
-      <p>Hora: ${escapar(p.time || "Por definir")}</p>
-
-      <button onclick="editarPartido(${i})">
-        Editar partido
-      </button>
-
-      <button class="danger"
-        onclick="eliminarPartidoFixture(${i})">
-        Eliminar
-      </button>
-    </article>
-  `).join("");
-}
-
-window.editarPartido = async indice => {
-  if (!administrador || !torneo) return;
-
-  const partido = torneo.upcoming[indice];
-  if (!partido) return;
-
-  const local = prompt("Equipo local:", partido.home);
-  if (local === null) return;
-
-  const visitante = prompt("Equipo visitante:", partido.away);
-  if (visitante === null) return;
-
-  const fecha = prompt("Jornada o fecha:", partido.date || "");
-  if (fecha === null) return;
-
-  const hora = prompt("Hora del partido:", partido.time || "");
-  if (hora === null) return;
-
-  const nombres = torneo.teams;
-
-  if (
-    !nombres.includes(local.trim()) ||
-    !nombres.includes(visitante.trim()) ||
-    local.trim() === visitante.trim()
-  ) {
-    return alert("Selecciona dos equipos válidos y diferentes.");
-  }
-
-  partido.home = local.trim();
-  partido.away = visitante.trim();
-  partido.date = fecha.trim() || "Por programar";
-  partido.time = hora.trim();
-
-  renderizar();
-  await guardar();
-};
-
-window.eliminarPartidoFixture = async indice => {
-  if (!administrador || !torneo) return;
-
-  if (!confirm("¿Eliminar este partido del fixture?")) return;
-
-  torneo.upcoming.splice(indice, 1);
-
-  renderizar();
-  await guardar();
-};
-function pintarEditorFixture() {
-  const cont = $("editorFixture");
-  if (!cont || !administrador) return;
-
-  if (!torneo.upcoming.length) {
-    cont.textContent = "Primero genera el fixture del torneo.";
-    return;
-  }
-
-  cont.innerHTML = torneo.upcoming.map((p, i) => `
-    <article class="match">
-      <h3>${escapar(p.group || "General")} -
-        Jornada ${escapar(p.round || 1)}</h3>
-
-      <p>
-        <b>${escapar(p.home)}</b> VS
-        <b>${escapar(p.away)}</b>
-      </p>
-
-      <label>Fecha</label>
-      <input type="date"
-        id="fixtureFecha${i}"
-        value="${escapar(p.date || "")}">
-
-      <label>Hora</label>
-      <input type="time"
-        id="fixtureHora${i}"
-        value="${escapar(p.time || "")}">
-
-      <button type="button"
-        onclick="guardarHorarioFixture(${i})">
-        Guardar fecha y hora
-      </button>
-    </article>
-  `).join("");
-}
-
-window.guardarHorarioFixture = async indice => {
-  if (!administrador || !torneo) return;
-
-  const partido = torneo.upcoming[indice];
-  if (!partido) return;
-
-  partido.date = $("fixtureFecha" + indice).value;
-  partido.time = $("fixtureHora" + indice).value;
-
-  await guardar();
-  renderizar();
-
-  alert("Fecha y hora guardadas correctamente.");
-};
 
 window.agregarProximo = async function () {
   const home = $("proximoLocal").value;
@@ -846,26 +713,26 @@ window.agregarProximo = async function () {
 };
 
 window.guardarTransmision = async function () {
-  if (!administrador) return;
-  const youtube = $("urlYouTube")?.value.trim() || "";
-  const tiktok = $("urlTikTok")?.value.trim() || "";
-  const facebook = $("urlFacebook")?.value.trim() || "";
-  const validar = (valor, dominios, etiqueta, rutaOpcional = false) => {
-    if (!valor) return "";
-    const u = new URL(valor);
-    if (!dominios.includes(u.hostname.toLowerCase())) throw new Error("Revisa el enlace de " + etiqueta + ".");
-    if (etiqueta === "YouTube" && !u.pathname.startsWith("/embed/")) throw new Error("YouTube debe usar un enlace /embed/.");
-    return u.href;
-  };
+  const url = $("urlYouTube").value.trim();
+
   try {
-    torneo.liveUrl = validar(youtube, ["youtube.com", "www.youtube.com", "www.youtube-nocookie.com"], "YouTube");
-    torneo.tiktokUrl = validar(tiktok, ["tiktok.com", "www.tiktok.com", "vm.tiktok.com"], "TikTok");
-    torneo.facebookUrl = validar(facebook, ["facebook.com", "www.facebook.com", "fb.watch", "m.facebook.com"], "Facebook");
+    const u = new URL(url);
+
+    if (
+      !["youtube.com", "www.youtube.com", "www.youtube-nocookie.com"]
+        .includes(u.hostname) ||
+      !u.pathname.startsWith("/embed/")
+    ) {
+      throw new Error();
+    }
+
+    torneo.liveUrl = u.href;
+
     renderizar();
     await guardar();
-    mensaje("Enlaces de transmisión guardados.");
-  } catch (error) {
-    alert(error.message || "Uno de los enlaces no es válido.");
+
+  } catch {
+    alert("Introduce un enlace de YouTube Embed válido.");
   }
 };
 

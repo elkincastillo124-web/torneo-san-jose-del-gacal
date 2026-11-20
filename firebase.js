@@ -60,14 +60,10 @@ export const equiposIniciales = [
 export function datosIniciales() {
   return {
     teams: equiposIniciales,
-    format: "grupos",
-    groupCount: 2,
     groupDraw: null,
     matches: [],
     upcoming: [],
     liveUrl: "",
-    tiktokUrl: "",
-    facebookUrl: "",
     timer: {
       seconds: 0,
       startedAt: null,
