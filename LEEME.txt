@@ -1,31 +1,37 @@
 TORNEO RELÁMPAGO SAN JOSÉ DEL GACAL
-====================================
 
-Archivos:
-- index.html: página principal
-- sorteo.html: sorteo y grupos
-- posiciones.html: tablas de posiciones y clasificación
+CONTENIDO
+- index.html: página de inicio
+- sorteo.html: grupos y sorteo
+- posiciones.html: tablas de posiciones
 - calendario.html: próximos partidos
-- resultados.html: marcadores registrados
-- envivo.html: enlaces de transmisión
-- admin.html: panel de administración
+- resultados.html: resultados registrados
+- envivo.html: transmisión
+- admin.html: panel de administración e inicio de sesión
 - estilos.css: diseño visual
-- firebase.js: conexión a Firebase
-- app.js: lógica del torneo
+- firebase.js: configuración de Firebase y UID autorizado
+- app.js: lógica de la aplicación
 
-IMPORTANTE:
-1. Mantén todos estos archivos juntos en la misma carpeta.
-2. Publica la carpeta raíz del repositorio en GitHub Pages.
-3. El proyecto utiliza Firebase Realtime Database y Firebase Authentication.
-4. Conserva las reglas de Firebase con lectura pública y escritura limitada
-   al UID administrador configurado en firebase.js.
-5. El formato de grupos implementado utiliza dos grupos (A y B).
-6. La generación de fixture produce los partidos de fase regular. En eliminación
-   directa genera la primera ronda; las siguientes rondas deben completarse
-   según los resultados.
-7. No compartas contraseñas ni credenciales de administrador.
+INSTALACIÓN / ACTUALIZACIÓN
+1. Haz una copia de seguridad de la carpeta actual del proyecto.
+2. Extrae esta carpeta ZIP.
+3. Copia los archivos de esta carpeta sobre la carpeta original del repositorio GitHub.
+4. Acepta reemplazar los archivos con el mismo nombre.
+5. En Visual Studio Code abre Terminal y ejecuta:
+   git add .
+   git commit -m "Corrige acceso y funciones del torneo"
+   git push origin main
+6. Espera a que GitHub Pages publique y recarga el sitio con Ctrl+F5.
 
-Para publicar cambios desde la terminal:
-  git add .
-  git commit -m "Actualizacion del torneo"
-  git push origin main
+IMPORTANTE SOBRE EL ACCESO ADMINISTRADOR
+- Este paquete conserva el UID administrador configurado previamente en firebase.js.
+- El correo y la contraseña deben pertenecer a un usuario creado en Firebase Authentication.
+- El UID real de ese usuario debe coincidir exactamente con ADMIN_UID en firebase.js.
+- Si no coincide, el sistema mostrará el UID detectado y rechazará el acceso. No se debe quitar esta comprobación ni abrir los permisos de escritura.
+- En Firebase Console > Authentication > Sign-in method, habilita Correo electrónico/Contraseña.
+- En Authentication > Settings > Authorized domains, verifica que esté agregado:
+  elkincastillo124-web.github.io
+- No compartas tu contraseña ni claves privadas.
+
+NOTA DE PRUEBAS
+Se verificó la sintaxis JavaScript con Node.js. La autenticación real depende de la configuración y del usuario existente en tu proyecto Firebase; no se puede confirmar desde este paquete sin iniciar sesión en tu cuenta.
