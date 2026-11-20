@@ -6,11 +6,11 @@
 <section class="card"><h2>Registrar resultado</h2><label for="local">Equipo local</label><select id="local"></select><label for="visitante">Equipo visitante</label><select id="visitante"></select><div class="grid"><div><label for="golesLocal">Goles local</label><input id="golesLocal" type="number" min="0" step="1"></div><div><label for="golesVisitante">Goles visitante</label><input id="golesVisitante" type="number" min="0" step="1"></div></div><label for="fechaResultado">Fecha / jornada</label><input id="fechaResultado" placeholder="Ej. Jornada 1"><button type="button" onclick="registrarResultado()">Guardar resultado</button></section>
 <section class="card"><h2>Agregar partido al calendario</h2><label for="proximoLocal">Equipo local</label><select id="proximoLocal"></select><label for="proximoVisitante">Equipo visitante</label><select id="proximoVisitante"></select><label for="fechaProximo">Fecha / hora</label><input id="fechaProximo" placeholder="Ej. Sábado 3:00 p. m."><button type="button" onclick="agregarProximo()">Agregar partido</button></section>
 <section class="card">
-  <h2>Editar fixture del torneo</h2>
+  <h2>Editar horarios del fixture</h2>
   <p class="muted">
-    Modifica los enfrentamientos, jornadas, fechas y horarios.
+    Cambia la fecha y la hora de los partidos generados.
   </p>
-  <div id="editorCalendario">
+  <div id="editorFixture">
     Cargando fixture...
   </div>
 </section>

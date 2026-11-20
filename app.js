@@ -149,21 +149,8 @@ function crearGrupos(equipos, cantidad) {
   return grupos;
 }
 
-function partidosTodosContraTodos(equipos, idaVuelta = false) {
-  const partidos = [];
-  for (let i = 0; i < equipos.length; i++) {
-    for (let j = i + 1; j < equipos.length; j++) {
-      partidos.push({ home: equipos[i], away: equipos[j], date: "Por programar" });
-      if (idaVuelta) partidos.push({ home: equipos[j], away: equipos[i], date: "Por programar" });
-    }
-  }
-  return partidos;
-}
-
-function crearFixtureGrupo(equipos, grupo, idaVuelta = false) {
+function partidosTodosContraTodos(equipos, idaVuelta = false, grupo = "General") {
   const lista = [...equipos];
-
-  // Si hay un número impar, un equipo descansa por jornada.
   if (lista.length % 2 !== 0) lista.push(null);
 
   const cantidad = lista.length;
@@ -178,47 +165,33 @@ function crearFixtureGrupo(equipos, grupo, idaVuelta = false) {
 
       if (local && visitante) {
         partidos.push({
+          id: `${grupo}-${ronda + 1}-${i + 1}`,
+          group: grupo,
+          round: ronda + 1,
           home: ronda % 2 === 0 ? local : visitante,
-          away: ronda % 2 === 0 ? visitante : local
+          away: ronda % 2 === 0 ? visitante : local,
+          date: "",
+          time: ""
         });
       }
     }
 
     jornadas.push(partidos);
-
-    // Rotación de equipos para la siguiente jornada.
     lista.splice(1, 0, lista.pop());
   }
 
-  const fixture = [];
-
-  jornadas.forEach((partidos, indice) => {
-    partidos.forEach((p, i) => {
-      fixture.push({
-        id: `${grupo}-${indice + 1}-${i + 1}`,
-        group: grupo,
-        round: indice + 1,
-        home: p.home,
-        away: p.away,
-        date: `Jornada ${indice + 1}`,
-        time: ""
-      });
-    });
-  });
+  let fixture = jornadas.flat();
 
   if (idaVuelta) {
-    const primeraVuelta = [...fixture];
+    const vuelta = fixture.map((p, i) => ({
+      ...p,
+      id: `${p.id}-vuelta-${i + 1}`,
+      round: p.round + jornadas.length,
+      home: p.away,
+      away: p.home
+    }));
 
-    primeraVuelta.forEach((p, i) => {
-      fixture.push({
-        ...p,
-        id: `${grupo}-vuelta-${i + 1}`,
-        round: p.round + jornadas.length,
-        home: p.away,
-        away: p.home,
-        date: `Jornada ${p.round + jornadas.length}`
-      });
-    });
+    fixture = [...fixture, ...vuelta];
   }
 
   return fixture;
@@ -227,25 +200,18 @@ function crearFixtureGrupo(equipos, grupo, idaVuelta = false) {
 function generarCalendario() {
   torneo.upcoming = [];
 
-  if (torneo.format === "todos") {
-    torneo.upcoming = crearFixtureGrupo(
+  if (torneo.format === "todos" ||
+      torneo.format === "ida_vuelta") {
+    torneo.upcoming = partidosTodosContraTodos(
       torneo.teams,
-      "General"
-    );
-  }
-
-  else if (torneo.format === "ida_vuelta") {
-    torneo.upcoming = crearFixtureGrupo(
-      torneo.teams,
-      "General",
-      true
+      torneo.format === "ida_vuelta"
     );
   }
 
   else if (torneo.format === "grupos" && torneo.groupDraw) {
     Object.entries(torneo.groupDraw).forEach(([grupo, equipos]) => {
       torneo.upcoming.push(
-        ...crearFixtureGrupo(equipos, grupo)
+        ...partidosTodosContraTodos(equipos, false, grupo)
       );
     });
   }
@@ -255,46 +221,17 @@ function generarCalendario() {
 
     for (let i = 0; i < equipos.length; i += 2) {
       torneo.upcoming.push({
-        id: `eliminacion-${i}`,
+        id: `eliminacion-${i + 1}`,
         group: "Eliminación",
         round: 1,
         home: equipos[i],
         away: equipos[i + 1] || "Pasa directamente",
-        date: "Primera ronda",
+        date: "",
         time: ""
       });
     }
   }
 }
-function pintarInicio() {
-  if ($("cantidadEquipos")) {
-    $("cantidadEquipos").textContent = torneo.teams.length;
-    $("cantidadPartidos").textContent = torneo.matches.length;
-    $("cantidadGoles").textContent = torneo.matches.reduce(
-      (s, p) => s + Number(p.hg) + Number(p.ag), 0
-    );
-  }
-}
-
-function pintarSorteo() {
-  const contenedor = $("grupos");
-  if (!contenedor) return;
-
-  if (!torneo.groupDraw || !Object.keys(torneo.groupDraw).length) {
-    contenedor.textContent = torneo.format === "eliminacion"
-      ? "Este torneo se juega por eliminación directa."
-      : "Este formato no utiliza grupos.";
-    return;
-  }
-
-  contenedor.innerHTML = Object.entries(torneo.groupDraw).map(([grupo, equipos]) => `
-    <div class="draw-group">
-      <h3>${escapar(grupo.startsWith("Grupo") ? grupo.toUpperCase() : "GRUPO " + grupo)}</h3>
-      <ol>${equipos.map(equipo => `<li>${escapar(equipo)}</li>`).join("")}</ol>
-    </div>
-  `).join("");
-}
-
 function pintarPosiciones() {
   const contenedor = $("tablas");
   if (!contenedor) return;
@@ -370,32 +307,49 @@ function pintarResultados() {
     `).join("")
     : "Todavía no hay resultados registrados.";
 }
-
 function pintarCalendario() {
-  const contenedor = $("listaProximos");
-  if (!contenedor) return;
+  const cont = $("listaProximos");
+  if (!cont) return;
 
-  contenedor.innerHTML = torneo.upcoming.length
-    ? torneo.upcoming.map(p => `
-      <div class="match">
-        <div class="muted">
-          ${escapar(p.group || "General")} -
-          Jornada ${escapar(p.round || "")}
-        </div>
+  if (!torneo.upcoming.length) {
+    cont.textContent = "Todavía no hay partidos programados.";
+    return;
+  }
 
-        <div class="muted">
-          ${escapar(p.date || "Fecha por definir")}
-          ${escapar(p.time || "")}
-        </div>
+  const jornadas = {};
 
-        <div class="score">
-          <span>${escapar(p.home)}</span>
-          <b>VS</b>
-          <span>${escapar(p.away)}</span>
-        </div>
-      </div>
-    `).join("")
-    : "No hay partidos programados.";
+  torneo.upcoming.forEach(p => {
+    const nombre = p.round || 1;
+    const grupo = p.group || "General";
+    const clave = `${grupo} - Jornada ${nombre}`;
+
+    if (!jornadas[clave]) jornadas[clave] = [];
+    jornadas[clave].push(p);
+  });
+
+  cont.innerHTML = Object.entries(jornadas).map(([jornada, partidos]) => `
+    <section class="card">
+      <h3>${escapar(jornada)}</h3>
+
+      ${partidos.map(p => `
+        <article class="match">
+          <div class="score">
+            <span>${escapar(p.home)}</span>
+            <b>VS</b>
+            <span>${escapar(p.away)}</span>
+          </div>
+
+          <div class="muted">
+            Fecha: ${escapar(p.date || "Por definir")}
+          </div>
+
+          <div class="muted">
+            Hora: ${escapar(p.time || "Por definir")}
+          </div>
+        </article>
+      `).join("")}
+    </section>
+  `).join("");
 }
 
 function pintarEnVivo() {
@@ -467,6 +421,8 @@ function mostrarAdministrador() {
 }
 
 function renderizar() {
+  if (!torneo) return;
+
   pintarInicio();
   pintarSorteo();
   pintarPosiciones();
@@ -474,7 +430,7 @@ function renderizar() {
   pintarCalendario();
   pintarEnVivo();
   pintarEquiposAdmin();
-  pintarCalendarioAdmin
+  pintarEditorFixture();
   pintarCronometro();
   mostrarAdministrador();
 }
@@ -801,6 +757,57 @@ window.eliminarPartidoFixture = async indice => {
 
   renderizar();
   await guardar();
+};
+function pintarEditorFixture() {
+  const cont = $("editorFixture");
+  if (!cont || !administrador) return;
+
+  if (!torneo.upcoming.length) {
+    cont.textContent = "Primero genera el fixture del torneo.";
+    return;
+  }
+
+  cont.innerHTML = torneo.upcoming.map((p, i) => `
+    <article class="match">
+      <h3>${escapar(p.group || "General")} -
+        Jornada ${escapar(p.round || 1)}</h3>
+
+      <p>
+        <b>${escapar(p.home)}</b> VS
+        <b>${escapar(p.away)}</b>
+      </p>
+
+      <label>Fecha</label>
+      <input type="date"
+        id="fixtureFecha${i}"
+        value="${escapar(p.date || "")}">
+
+      <label>Hora</label>
+      <input type="time"
+        id="fixtureHora${i}"
+        value="${escapar(p.time || "")}">
+
+      <button type="button"
+        onclick="guardarHorarioFixture(${i})">
+        Guardar fecha y hora
+      </button>
+    </article>
+  `).join("");
+}
+
+window.guardarHorarioFixture = async indice => {
+  if (!administrador || !torneo) return;
+
+  const partido = torneo.upcoming[indice];
+  if (!partido) return;
+
+  partido.date = $("fixtureFecha" + indice).value;
+  partido.time = $("fixtureHora" + indice).value;
+
+  await guardar();
+  renderizar();
+
+  alert("Fecha y hora guardadas correctamente.");
 };
 
 window.agregarProximo = async function () {
