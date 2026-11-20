@@ -526,7 +526,7 @@ window.aplicarConfiguracionTorneo = async function () {
     ? crearGrupos(torneo.teams, torneo.groupCount)
     : null;
 
-  torneo.upcoming = [];
+  generarCalendario();
   renderizar();
   await guardar();
   mensaje("Configuración del torneo guardada.");
